@@ -12,10 +12,55 @@ import (
 )
 
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Email       string    `json:"email"`
+	IsChirpyRed bool      `json:"is_chirpy_red"`
+}
+
+type Event struct {
+	Event string `json:"event"`
+	Data  Data   `json:"data"`
+}
+
+type Data struct {
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (cfg *apiConfig) handleUserUpgrade(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	params := Event{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "JSON Body not formatted correctly", err)
+		return
+	}
+
+	if params.Event != "user.upgraded" {
+		respondWithJSON(w, http.StatusNoContent, struct{}{})
+		return
+	}
+
+	_, err = cfg.db.GetUserInfoByUuid(r.Context(), params.Data.UserID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "User not found", err)
+		return
+	}
+
+	err = cfg.db.UpgradeUserToChirpyRed(r.Context(), params.Data.UserID)
+	if err != nil {
+		respondWithError(
+			w,
+			http.StatusInternalServerError,
+			"Could not upgrade member to chirpy red",
+			err,
+		)
+		return
+	}
+
+	respondWithJSON(w, http.StatusNoContent, struct{}{})
+	return
 }
 
 func (cfg *apiConfig) handleUpdateEmail(w http.ResponseWriter, r *http.Request) {
@@ -75,10 +120,11 @@ func (cfg *apiConfig) handleUpdateEmail(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondWithJSON(w, http.StatusOK, User{
-		ID:        userInfo.ID,
-		CreatedAt: userInfo.CreatedAt,
-		UpdatedAt: userInfo.UpdatedAt,
-		Email:     userInfo.Email,
+		ID:          userInfo.ID,
+		CreatedAt:   userInfo.CreatedAt,
+		UpdatedAt:   userInfo.UpdatedAt,
+		Email:       userInfo.Email,
+		IsChirpyRed: userInfo.IsChirpyRed,
 	})
 }
 
@@ -226,10 +272,11 @@ func (cfg *apiConfig) handleLoginUser(w http.ResponseWriter, r *http.Request) {
 
 	respondWithJSON(w, http.StatusOK, response{
 		User: User{
-			ID:        dbUser.ID,
-			CreatedAt: dbUser.CreatedAt,
-			UpdatedAt: dbUser.UpdatedAt,
-			Email:     dbUser.Email,
+			ID:          dbUser.ID,
+			CreatedAt:   dbUser.CreatedAt,
+			UpdatedAt:   dbUser.UpdatedAt,
+			Email:       dbUser.Email,
+			IsChirpyRed: dbUser.IsChirpyRed,
 		},
 		Token:        accessToken,
 		RefreshToken: refreshToken,
@@ -280,10 +327,11 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	respondWithJSON(w, http.StatusCreated, response{
 		User: User{
-			ID:        user.ID,
-			CreatedAt: user.CreatedAt,
-			UpdatedAt: user.UpdatedAt,
-			Email:     user.Email,
+			ID:          user.ID,
+			CreatedAt:   user.CreatedAt,
+			UpdatedAt:   user.UpdatedAt,
+			Email:       user.Email,
+			IsChirpyRed: user.IsChirpyRed,
 		},
 	})
 }
