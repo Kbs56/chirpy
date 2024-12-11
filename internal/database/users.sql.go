@@ -58,7 +58,7 @@ func (q *Queries) DeleteAllUsers(ctx context.Context) error {
 }
 
 const getUserInfoByEmail = `-- name: GetUserInfoByEmail :one
-SELECT id, created_at, updated_at, email, hashed_password
+SELECT id, created_at, updated_at, email, hashed_password, is_chirpy_red
 FROM users
 WHERE email = $1 LIMIT 1
 `
@@ -72,12 +72,13 @@ func (q *Queries) GetUserInfoByEmail(ctx context.Context, email string) (User, e
 		&i.UpdatedAt,
 		&i.Email,
 		&i.HashedPassword,
+		&i.IsChirpyRed,
 	)
 	return i, err
 }
 
 const getUserInfoByUuid = `-- name: GetUserInfoByUuid :one
-SELECT id, created_at, updated_at, email, hashed_password
+SELECT id, created_at, updated_at, email, hashed_password, is_chirpy_red
 FROM users
 WHERE id = $1
 `
@@ -91,6 +92,7 @@ func (q *Queries) GetUserInfoByUuid(ctx context.Context, id uuid.UUID) (User, er
 		&i.UpdatedAt,
 		&i.Email,
 		&i.HashedPassword,
+		&i.IsChirpyRed,
 	)
 	return i, err
 }
@@ -99,7 +101,7 @@ const updateEmailAndPassword = `-- name: UpdateEmailAndPassword :one
 UPDATE users
 SET email = $1, hashed_password = $2, updated_at = CURRENT_TIMESTAMP
 WHERE id = $3
-returning id, created_at, updated_at, email, hashed_password
+returning id, created_at, updated_at, email, hashed_password, is_chirpy_red
 `
 
 type UpdateEmailAndPasswordParams struct {
@@ -117,6 +119,18 @@ func (q *Queries) UpdateEmailAndPassword(ctx context.Context, arg UpdateEmailAnd
 		&i.UpdatedAt,
 		&i.Email,
 		&i.HashedPassword,
+		&i.IsChirpyRed,
 	)
 	return i, err
+}
+
+const upgradeUserToChirpyRed = `-- name: UpgradeUserToChirpyRed :exec
+UPDATE users
+SET is_chirpy_red = TRUE
+where id = $1
+`
+
+func (q *Queries) UpgradeUserToChirpyRed(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, upgradeUserToChirpyRed, id)
+	return err
 }
