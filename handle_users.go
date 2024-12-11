@@ -18,6 +18,77 @@ type User struct {
 	Email     string    `json:"email"`
 }
 
+func (cfg *apiConfig) handleUpdateEmail(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	type updatedUser struct {
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Email     string    `json:"email"`
+	}
+
+	accessToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
+		return
+	}
+
+	validatedUserId, err := auth.ValidateJWT(accessToken, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
+		return
+	}
+
+	dbUser, err := cfg.db.GetUserInfoByUuid(r.Context(), validatedUserId)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "User to update not found", err)
+		return
+	}
+
+	if validatedUserId != dbUser.ID {
+		respondWithError(w, http.StatusForbidden, "Unauthroized", err)
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err = decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Malformed Request Body", err)
+		return
+	}
+
+	hashedPassword, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not update users password", err)
+		return
+	}
+
+	userInfo, err := cfg.db.UpdateEmailAndPassword(
+		r.Context(),
+		database.UpdateEmailAndPasswordParams{
+			Email:          params.Email,
+			HashedPassword: hashedPassword,
+			ID:             validatedUserId,
+		},
+	)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not update user info", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, updatedUser{
+		ID:        userInfo.ID,
+		CreatedAt: userInfo.CreatedAt,
+		UpdatedAt: userInfo.UpdatedAt,
+		Email:     userInfo.Email,
+	})
+}
+
 func (cfg *apiConfig) handleRevoke(w http.ResponseWriter, r *http.Request) {
 	refreshToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
@@ -111,7 +182,7 @@ func (cfg *apiConfig) handleLoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbUser, err := cfg.db.GetUserInfo(r.Context(), params.Email)
+	dbUser, err := cfg.db.GetUserInfoByEmail(r.Context(), params.Email)
 	if err != nil {
 		respondWithError(w, http.StatusNotFound, "User not found", nil)
 		return

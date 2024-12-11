@@ -57,14 +57,59 @@ func (q *Queries) DeleteAllUsers(ctx context.Context) error {
 	return err
 }
 
-const getUserInfo = `-- name: GetUserInfo :one
+const getUserInfoByEmail = `-- name: GetUserInfoByEmail :one
 SELECT id, created_at, updated_at, email, hashed_password
 FROM users
 WHERE email = $1 LIMIT 1
 `
 
-func (q *Queries) GetUserInfo(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserInfo, email)
+func (q *Queries) GetUserInfoByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserInfoByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.HashedPassword,
+	)
+	return i, err
+}
+
+const getUserInfoByUuid = `-- name: GetUserInfoByUuid :one
+SELECT id, created_at, updated_at, email, hashed_password
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) GetUserInfoByUuid(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserInfoByUuid, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.HashedPassword,
+	)
+	return i, err
+}
+
+const updateEmailAndPassword = `-- name: UpdateEmailAndPassword :one
+UPDATE users
+SET email = $1, hashed_password = $2, updated_at = CURRENT_TIMESTAMP
+WHERE id = $3
+returning id, created_at, updated_at, email, hashed_password
+`
+
+type UpdateEmailAndPasswordParams struct {
+	Email          string
+	HashedPassword string
+	ID             uuid.UUID
+}
+
+func (q *Queries) UpdateEmailAndPassword(ctx context.Context, arg UpdateEmailAndPasswordParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateEmailAndPassword, arg.Email, arg.HashedPassword, arg.ID)
 	var i User
 	err := row.Scan(
 		&i.ID,

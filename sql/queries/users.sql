@@ -12,7 +12,18 @@ RETURNING id, created_at, updated_at, email;
 -- name: DeleteAllUsers :exec
 DELETE FROM users;
 
--- name: GetUserInfo :one
+-- name: GetUserInfoByEmail :one
 SELECT *
 FROM users
 WHERE email = $1 LIMIT 1;
+
+-- name: GetUserInfoByUuid :one
+SELECT *
+FROM users
+WHERE id = $1;
+
+-- name: UpdateEmailAndPassword :one
+UPDATE users
+SET email = $1, hashed_password = $2, updated_at = CURRENT_TIMESTAMP
+WHERE id = $3
+returning *;
