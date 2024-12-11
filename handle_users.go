@@ -24,13 +24,6 @@ func (cfg *apiConfig) handleUpdateEmail(w http.ResponseWriter, r *http.Request) 
 		Password string `json:"password"`
 	}
 
-	type updatedUser struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Email     string    `json:"email"`
-	}
-
 	accessToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
@@ -81,7 +74,7 @@ func (cfg *apiConfig) handleUpdateEmail(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, updatedUser{
+	respondWithJSON(w, http.StatusOK, User{
 		ID:        userInfo.ID,
 		CreatedAt: userInfo.CreatedAt,
 		UpdatedAt: userInfo.UpdatedAt,
