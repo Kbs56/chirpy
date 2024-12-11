@@ -27,10 +27,55 @@ type Chirp struct {
 	UserID    uuid.UUID `json:"user_id"`
 }
 
+func (cfg *apiConfig) handleDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	accessToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
+		return
+	}
+
+	id, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Please use a valid chirp ID", err)
+	}
+
+	validatedID, err := auth.ValidateJWT(accessToken, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "Unauthorized", err)
+		return
+	}
+
+	dbUser, err := cfg.db.GetUserInfoByUuid(r.Context(), validatedID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Could not find user", err)
+		return
+	}
+
+	dbChirp, err := cfg.db.GetChirp(r.Context(), id)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Could not find chirp", err)
+		return
+	}
+
+	if dbChirp.UserID != dbUser.ID {
+		respondWithError(w, http.StatusForbidden, "Unauthorized", err)
+		return
+	}
+
+	err = cfg.db.DeleteChirp(r.Context(), id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not remove chirp", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusNoContent, struct{}{})
+	return
+}
+
 func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("chirpID"))
 	if err != nil {
-		respondWithError(w, http.StatusBadGateway, "Please use a valid chirp ID", err)
+		respondWithError(w, http.StatusBadRequest, "Please use a valid chirp ID", err)
 	}
 
 	dbChirp, err := cfg.db.GetChirp(r.Context(), id)
