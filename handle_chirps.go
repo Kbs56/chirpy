@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -69,7 +70,6 @@ func (cfg *apiConfig) handleDeleteChirp(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondWithJSON(w, http.StatusNoContent, struct{}{})
-	return
 }
 
 func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter, r *http.Request) {
@@ -93,20 +93,29 @@ func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusOK, chirp)
-	return
 }
 
 func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 	authorId := r.URL.Query().Get("author_id")
-	id, err := uuid.Parse(authorId)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid author ID", err)
-		return
+	var authorUuid uuid.UUID
+	if authorId != "" {
+		id, err := uuid.Parse(authorId)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid author ID", err)
+			return
+		}
+		authorUuid = id
 	}
 
-	var dbChirps []database.Chirp
+	sortDirection := "asc"
+	sortDirectionParam := r.URL.Query().Get("sort")
+	if sortDirectionParam == "desc" {
+		sortDirection = "desc"
+	}
+
+	var dbChirpsFromQuery []database.Chirp
 	if authorId != "" {
-		dbChirps, err = cfg.db.GetUserChirps(r.Context(), id)
+		dbChirps, err := cfg.db.GetUserChirps(r.Context(), authorUuid)
 		if err != nil {
 			respondWithError(
 				w,
@@ -116,16 +125,18 @@ func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 			)
 			return
 		}
+		dbChirpsFromQuery = dbChirps
 	} else {
-		dbChirps, err = cfg.db.GetAllChirps(r.Context())
+		dbChirps, err := cfg.db.GetAllChirps(r.Context())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Could not get chirps", err)
 			return
 		}
+		dbChirpsFromQuery = dbChirps
 	}
 
 	chirps := []Chirp{}
-	for _, dbChirp := range dbChirps {
+	for _, dbChirp := range dbChirpsFromQuery {
 		chirps = append(chirps, Chirp{
 			ID:        dbChirp.ID,
 			CreatedAt: dbChirp.CreatedAt,
@@ -135,8 +146,14 @@ func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	sort.Slice(chirps, func(i, j int) bool {
+		if sortDirection == "desc" {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		}
+		return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+	})
+
 	respondWithJSON(w, http.StatusOK, chirps)
-	return
 }
 
 func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) {
@@ -186,7 +203,6 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) 
 		UserID:    userID,
 		Body:      chirp.Body,
 	})
-	return
 }
 
 func validateChirp(body string) (string, error) {

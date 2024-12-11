@@ -50,7 +50,6 @@ func (cfg *apiConfig) handleUserUpgrade(w http.ResponseWriter, r *http.Request) 
 
 	if params.Event != "user.upgraded" {
 		respondWithJSON(w, http.StatusNoContent, struct{}{})
-		return
 	}
 
 	_, err = cfg.db.GetUserInfoByUuid(r.Context(), params.Data.UserID)
@@ -71,7 +70,6 @@ func (cfg *apiConfig) handleUserUpgrade(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondWithJSON(w, http.StatusNoContent, struct{}{})
-	return
 }
 
 func (cfg *apiConfig) handleUpdateEmail(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +151,6 @@ func (cfg *apiConfig) handleRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusNoContent, struct{}{})
-	return
 }
 
 func (cfg *apiConfig) handleRefresh(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +195,6 @@ func (cfg *apiConfig) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, response{
 		Token: jwt,
 	})
-	return
 }
 
 func (cfg *apiConfig) handleLoginUser(w http.ResponseWriter, r *http.Request) {
