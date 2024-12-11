@@ -101,3 +101,13 @@ func MakeRefreshToken() (string, error) {
 	}
 	return hex.EncodeToString(b), nil
 }
+
+func GetAPIKey(headers http.Header) (string, error) {
+	authHeader := headers.Get("Authorization")
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "ApiKey" {
+		return "", fmt.Errorf("invalid api key format")
+	}
+	apiKey := parts[1]
+	return apiKey, nil
+}

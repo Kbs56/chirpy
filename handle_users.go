@@ -29,9 +29,20 @@ type Data struct {
 }
 
 func (cfg *apiConfig) handleUserUpgrade(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Please provide a valid api key", err)
+		return
+	}
+
+	if apiKey != cfg.polkaKey {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := Event{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "JSON Body not formatted correctly", err)
 		return
